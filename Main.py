@@ -1,3 +1,4 @@
-from Models import function                  
-                                             
-function.print_number(10)                    
+from Interface.App import MatcomFunctionLabApp
+
+if __name__ == "__main__":
+    MatcomFunctionLabApp()
