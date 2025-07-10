@@ -8,6 +8,13 @@ display window for mathematical function analysis results using CustomTkinter.
 import customtkinter as ctk
 from typing import Dict, Any, List, Union
 import tkinter as tk
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+import sympy as sp
+import io
+from PIL import Image, ImageTk
+import numpy as np
 
 
 class ShowInfoFrame(ctk.CTkToplevel):
@@ -30,7 +37,7 @@ class ShowInfoFrame(ctk.CTkToplevel):
         
         self.analysis_results = analysis_results
         self.title("Análisis Detallado de la Función")
-        self.geometry("800x900")
+        self.geometry("900x1000")
         self.resizable(True, True)
         
         # Configure grid weights for responsiveness
@@ -48,6 +55,182 @@ class ShowInfoFrame(ctk.CTkToplevel):
         # Focus on this window
         self.focus()
         self.lift()
+    
+    def _create_latex_image(self, latex_string: str, font_size: int = 14) -> ImageTk.PhotoImage:
+        """
+        Create an image from a LaTeX string using matplotlib.
+        
+        Args:
+            latex_string: The LaTeX string to render
+            font_size: Font size for the rendered text
+            
+        Returns:
+            ImageTk.PhotoImage object for display in tkinter
+        """
+        try:
+            # Set matplotlib to use dark theme colors
+            plt.style.use('dark_background')
+            
+            # Create a figure with appropriate size
+            fig, ax = plt.subplots(figsize=(10, 1.2), dpi=120)
+            fig.patch.set_facecolor('#2b2b2b')  # Dark background
+            ax.set_facecolor('#2b2b2b')
+            
+            # Render the LaTeX text
+            ax.text(0.02, 0.5, f'${latex_string}$', 
+                   fontsize=font_size, 
+                   transform=ax.transAxes, 
+                   verticalalignment='center',
+                   horizontalalignment='left',
+                   color='white',
+                   family='serif')
+            
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.axis('off')
+            
+            # Save to bytes buffer with tight bounding box
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png', bbox_inches='tight', 
+                       facecolor='#2b2b2b', edgecolor='none', 
+                       dpi=120, pad_inches=0.1)
+            buf.seek(0)
+            
+            # Convert to PIL Image and then to PhotoImage
+            pil_image = Image.open(buf)
+            
+            # Resize if too large
+            max_width = 800
+            if pil_image.width > max_width:
+                ratio = max_width / pil_image.width
+                new_height = int(pil_image.height * ratio)
+                pil_image = pil_image.resize((max_width, new_height), Image.Resampling.LANCZOS)
+            
+            photo = ImageTk.PhotoImage(pil_image)
+            
+            plt.close(fig)
+            buf.close()
+            
+            return photo
+            
+        except Exception as e:
+            print(f"Error creating LaTeX image: {e}")
+            return None
+    
+    def _sympy_to_latex(self, expr_str: str) -> str:
+        """
+        Convert a SymPy expression string to LaTeX format.
+        
+        Args:
+            expr_str: String representation of a SymPy expression
+            
+        Returns:
+            LaTeX formatted string
+        """
+        try:
+            if isinstance(expr_str, dict) and 'error' in expr_str:
+                return r"\text{Error: " + str(expr_str['error']).replace('_', r'\_') + "}"
+            
+            if expr_str == 'No disponible' or expr_str is None:
+                return r"\text{No disponible}"
+            
+            # Convert string to proper format for SymPy
+            expr_str_clean = str(expr_str)
+            
+            # Handle common mathematical functions
+            replacements = {
+                'sqrt': 'sqrt',
+                'log': 'log',
+                'ln': 'log',
+                'sin': 'sin',
+                'cos': 'cos',
+                'tan': 'tan',
+                'exp': 'exp',
+                'pi': 'pi',
+                'e': 'E'
+            }
+            
+            # Parse with SymPy and convert to LaTeX
+            expr = sp.sympify(expr_str_clean)
+            latex_str = sp.latex(expr)
+            
+            # Clean up LaTeX formatting
+            latex_str = latex_str.replace('\\log', '\\ln')  # Use ln instead of log for natural log
+            
+            return latex_str
+            
+        except Exception as e:
+            print(f"Error converting to LaTeX: {e}")
+            # Return a safe LaTeX string
+            safe_str = str(expr_str).replace('_', r'\_').replace('^', r'\hat{}').replace('*', r' \cdot ')
+            return r"\text{" + safe_str + "}"
+    
+    def _add_latex_display(self, parent_frame, latex_string: str, row: int, 
+                          label_text: str = "", font_size: int = 14) -> int:
+        """
+        Add a LaTeX rendered mathematical expression to the frame.
+        
+        Args:
+            parent_frame: Parent frame to add the display to
+            latex_string: LaTeX string to render
+            row: Current row number
+            label_text: Optional label text
+            font_size: Font size for rendering
+            
+        Returns:
+            Next row number
+        """
+        try:
+            if label_text:
+                label = ctk.CTkLabel(
+                    parent_frame,
+                    text=label_text,
+                    font=ctk.CTkFont(size=14, weight="bold"),
+                    justify="left"
+                )
+                label.grid(row=row, column=0, sticky="w", padx=40, pady=(5, 2))
+                row += 1
+            
+            # Create LaTeX image
+            latex_image = self._create_latex_image(latex_string, font_size)
+            
+            if latex_image:
+                # Create a frame to hold the LaTeX image with dark background
+                latex_frame = ctk.CTkFrame(parent_frame, fg_color="#2b2b2b", corner_radius=5)
+                latex_frame.grid(row=row, column=0, sticky="ew", padx=60, pady=5)
+                latex_frame.grid_columnconfigure(0, weight=1)
+                
+                # Create label to display the image with matching background
+                image_label = tk.Label(latex_frame, image=latex_image, 
+                                     bg="#2b2b2b", bd=0, highlightthickness=0)
+                image_label.image = latex_image  # Keep a reference
+                image_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
+                
+            else:
+                # Fallback to regular text if LaTeX rendering fails
+                fallback_label = ctk.CTkLabel(
+                    parent_frame,
+                    text=latex_string,
+                    font=ctk.CTkFont(size=12, family="Courier"),
+                    wraplength=600,
+                    justify="left"
+                )
+                fallback_label.grid(row=row, column=0, sticky="w", padx=60, pady=2)
+            
+            return row + 1
+            
+        except Exception as e:
+            print(f"Error adding LaTeX display: {e}")
+            # Fallback to regular text
+            fallback_label = ctk.CTkLabel(
+                parent_frame,
+                text=f"{label_text}: {latex_string}",
+                font=ctk.CTkFont(size=12),
+                wraplength=600,
+                justify="left"
+            )
+            fallback_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+            return row + 1
     
     def _setup_interface(self):
         """Setup the complete interface with all analysis sections."""
@@ -112,11 +295,11 @@ class ShowInfoFrame(ctk.CTkToplevel):
         section_title.grid(row=row, column=0, sticky="w", padx=20, pady=(10, 5))
         row += 1
         
-        # Function string
+        # Function string (original input)
         func_str = self.analysis_results.get('function_string', 'No disponible')
         func_label = ctk.CTkLabel(
             self.main_frame,
-            text=f"Función original: {func_str}",
+            text=f"Función ingresada: {func_str}",
             font=ctk.CTkFont(size=14),
             wraplength=700,
             justify="left"
@@ -124,17 +307,39 @@ class ShowInfoFrame(ctk.CTkToplevel):
         func_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
         row += 1
         
-        # Parsed function
+        # Parsed function in LaTeX
         parsed_func = self.analysis_results.get('parsed_function', 'No disponible')
-        parsed_label = ctk.CTkLabel(
-            self.main_frame,
-            text=f"Función procesada: {parsed_func}",
-            font=ctk.CTkFont(size=14),
-            wraplength=700,
-            justify="left"
-        )
-        parsed_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
-        row += 1
+        if parsed_func and parsed_func != 'No disponible':
+            try:
+                latex_func = self._sympy_to_latex(parsed_func)
+                row = self._add_latex_display(
+                    self.main_frame, 
+                    f"f(x) = {latex_func}", 
+                    row, 
+                    "Función matemática:",
+                    font_size=16
+                )
+            except Exception as e:
+                print(f"Error rendering function LaTeX: {e}")
+                parsed_label = ctk.CTkLabel(
+                    self.main_frame,
+                    text=f"Función procesada: {parsed_func}",
+                    font=ctk.CTkFont(size=14),
+                    wraplength=700,
+                    justify="left"
+                )
+                parsed_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+                row += 1
+        else:
+            parsed_label = ctk.CTkLabel(
+                self.main_frame,
+                text=f"Función procesada: {parsed_func}",
+                font=ctk.CTkFont(size=14),
+                wraplength=700,
+                justify="left"
+            )
+            parsed_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+            row += 1
         
         # Parameters
         parameters = self.analysis_results.get('parameters', {})
@@ -165,29 +370,75 @@ class ShowInfoFrame(ctk.CTkToplevel):
         
         # First derivative
         first_deriv = self.analysis_results.get('first_derivative', 'No disponible')
-        first_deriv = self._format_result(first_deriv)
-        first_label = ctk.CTkLabel(
-            self.main_frame,
-            text=f"Primera derivada: f'(x) = {first_deriv}",
-            font=ctk.CTkFont(size=14),
-            wraplength=700,
-            justify="left"
-        )
-        first_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
-        row += 1
+        first_deriv_formatted = self._format_result(first_deriv)
+        
+        if first_deriv_formatted and first_deriv_formatted != 'No disponible':
+            try:
+                latex_first = self._sympy_to_latex(first_deriv_formatted)
+                row = self._add_latex_display(
+                    self.main_frame,
+                    f"f'(x) = {latex_first}",
+                    row,
+                    "Primera derivada:",
+                    font_size=14
+                )
+            except Exception as e:
+                print(f"Error rendering first derivative LaTeX: {e}")
+                first_label = ctk.CTkLabel(
+                    self.main_frame,
+                    text=f"Primera derivada: f'(x) = {first_deriv_formatted}",
+                    font=ctk.CTkFont(size=14),
+                    wraplength=700,
+                    justify="left"
+                )
+                first_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+                row += 1
+        else:
+            first_label = ctk.CTkLabel(
+                self.main_frame,
+                text=f"Primera derivada: f'(x) = {first_deriv_formatted}",
+                font=ctk.CTkFont(size=14),
+                wraplength=700,
+                justify="left"
+            )
+            first_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+            row += 1
         
         # Second derivative
         second_deriv = self.analysis_results.get('second_derivative', 'No disponible')
-        second_deriv = self._format_result(second_deriv)
-        second_label = ctk.CTkLabel(
-            self.main_frame,
-            text=f"Segunda derivada: f''(x) = {second_deriv}",
-            font=ctk.CTkFont(size=14),
-            wraplength=700,
-            justify="left"
-        )
-        second_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
-        row += 1
+        second_deriv_formatted = self._format_result(second_deriv)
+        
+        if second_deriv_formatted and second_deriv_formatted != 'No disponible':
+            try:
+                latex_second = self._sympy_to_latex(second_deriv_formatted)
+                row = self._add_latex_display(
+                    self.main_frame,
+                    f"f''(x) = {latex_second}",
+                    row,
+                    "Segunda derivada:",
+                    font_size=14
+                )
+            except Exception as e:
+                print(f"Error rendering second derivative LaTeX: {e}")
+                second_label = ctk.CTkLabel(
+                    self.main_frame,
+                    text=f"Segunda derivada: f''(x) = {second_deriv_formatted}",
+                    font=ctk.CTkFont(size=14),
+                    wraplength=700,
+                    justify="left"
+                )
+                second_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+                row += 1
+        else:
+            second_label = ctk.CTkLabel(
+                self.main_frame,
+                text=f"Segunda derivada: f''(x) = {second_deriv_formatted}",
+                font=ctk.CTkFont(size=14),
+                wraplength=700,
+                justify="left"
+            )
+            second_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+            row += 1
         
         return row + 1
     
