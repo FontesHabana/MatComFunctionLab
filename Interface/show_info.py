@@ -1,295 +1,600 @@
+"""
+Show information interface module for displaying function analysis results.
+
+This module provides the ShowInfoFrame class that creates a comprehensive
+display window for mathematical function analysis results using CustomTkinter.
+"""
+
 import customtkinter as ctk
+from typing import Dict, Any, List, Union
 import tkinter as tk
-import sympy as sp
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from sympy import symbols, sympify
 
-class ResultWindow(ctk.CTkToplevel):
-    def __init__(self, parent, function_str):
-        super().__init__(parent.app)
-        self.parent = parent
-        self.function_str = function_str
 
-        # Configuración de ventana
-        self.title("Resultados del Análisis")
-        self.geometry("1200x800")
-        self.configure(bg="#87CEEB")
-
-        # Hacer ventana modal
-        self.grab_set()
-        self.transient(parent.app)
-
-        # Variables
-        self.x = symbols('x')
-        self.parameters = {}
-
-        try:
-            self.function = sympify(function_str)
-            self.setup_ui()
-            self.plot_function()
-        except Exception as e:
-            self.show_error(f"Error:\n{str(e)}")
-
-    def setup_ui(self):
-        # Configuración de grid
+class ShowInfoFrame(ctk.CTkToplevel):
+    """
+    A CustomTkinter window for displaying comprehensive function analysis results.
+    
+    This class creates a detailed, organized display of mathematical function
+    analysis including derivatives, domain, intercepts, asymptotes, and behavior analysis.
+    """
+    
+    def __init__(self, master, analysis_results: Dict[str, Any]):
+        """
+        Initialize the ShowInfoFrame window.
+        
+        Args:
+            master: Parent widget
+            analysis_results: Dictionary containing function analysis results
+        """
+        super().__init__(master)
+        
+        self.analysis_results = analysis_results
+        self.title("Análisis Detallado de la Función")
+        self.geometry("800x900")
+        self.resizable(True, True)
+        
+        # Configure grid weights for responsiveness
         self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=2)  # Más espacio para gráfico
         self.grid_rowconfigure(0, weight=1)
-
-        # Frame izquierdo (análisis)
-        left_frame = ctk.CTkFrame(self, fg_color="#f0f0f0")
-        left_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
-
-        # Frame derecho (gráfico)
-        right_frame = ctk.CTkFrame(self)
-        right_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
-
-        # Botón de regreso (texto grande)
-        back_btn = ctk.CTkButton(
-            left_frame,
-            text="← VOLVER",
+        
+        # Create main scrollable frame
+        self.main_frame = ctk.CTkScrollableFrame(self, corner_radius=0)
+        self.main_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.main_frame.grid_columnconfigure(0, weight=1)
+        
+        # Setup the interface
+        self._setup_interface()
+        
+        # Focus on this window
+        self.focus()
+        self.lift()
+    
+    def _setup_interface(self):
+        """Setup the complete interface with all analysis sections."""
+        current_row = 0
+        
+        # Title
+        current_row = self._add_title(current_row)
+        
+        # Function Information
+        current_row = self._add_function_info(current_row)
+        
+        # Derivatives Section
+        current_row = self._add_derivatives_section(current_row)
+        
+        # Domain Section
+        current_row = self._add_domain_section(current_row)
+        
+        # Intercepts Section
+        current_row = self._add_intercepts_section(current_row)
+        
+        # Symmetry Section
+        current_row = self._add_symmetry_section(current_row)
+        
+        # Asymptotes Section
+        current_row = self._add_asymptotes_section(current_row)
+        
+        # Critical Points Section
+        current_row = self._add_critical_points_section(current_row)
+        
+        # Inflection Points Section
+        current_row = self._add_inflection_points_section(current_row)
+        
+        # Monotonicity Section
+        current_row = self._add_monotonicity_section(current_row)
+        
+        # Concavity Section
+        current_row = self._add_concavity_section(current_row)
+        
+        # Close button
+        self._add_close_button(current_row)
+    
+    def _add_title(self, row: int) -> int:
+        """Add the main title."""
+        title_label = ctk.CTkLabel(
+            self.main_frame,
+            text="ANÁLISIS COMPLETO DE LA FUNCIÓN",
+            font=ctk.CTkFont(size=24, weight="bold"),
+            text_color=("gray10", "gray90")
+        )
+        title_label.grid(row=row, column=0, sticky="ew", padx=20, pady=(10, 20))
+        return row + 1
+    
+    def _add_function_info(self, row: int) -> int:
+        """Add function information section."""
+        # Section title
+        section_title = ctk.CTkLabel(
+            self.main_frame,
+            text="INFORMACIÓN DE LA FUNCIÓN",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=("blue", "lightblue")
+        )
+        section_title.grid(row=row, column=0, sticky="w", padx=20, pady=(10, 5))
+        row += 1
+        
+        # Function string
+        func_str = self.analysis_results.get('function_string', 'No disponible')
+        func_label = ctk.CTkLabel(
+            self.main_frame,
+            text=f"Función original: {func_str}",
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        func_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        # Parsed function
+        parsed_func = self.analysis_results.get('parsed_function', 'No disponible')
+        parsed_label = ctk.CTkLabel(
+            self.main_frame,
+            text=f"Función procesada: {parsed_func}",
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        parsed_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        # Parameters
+        parameters = self.analysis_results.get('parameters', {})
+        if parameters:
+            params_text = ", ".join([f"{k}={v}" for k, v in parameters.items()])
+            params_label = ctk.CTkLabel(
+                self.main_frame,
+                text=f"Parámetros: {params_text}",
+                font=ctk.CTkFont(size=14),
+                wraplength=700,
+                justify="left"
+            )
+            params_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+            row += 1
+        
+        return row + 1
+    
+    def _add_derivatives_section(self, row: int) -> int:
+        """Add derivatives section."""
+        section_title = ctk.CTkLabel(
+            self.main_frame,
+            text="DERIVADAS",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=("blue", "lightblue")
+        )
+        section_title.grid(row=row, column=0, sticky="w", padx=20, pady=(10, 5))
+        row += 1
+        
+        # First derivative
+        first_deriv = self.analysis_results.get('first_derivative', 'No disponible')
+        first_deriv = self._format_result(first_deriv)
+        first_label = ctk.CTkLabel(
+            self.main_frame,
+            text=f"Primera derivada: f'(x) = {first_deriv}",
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        first_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        # Second derivative
+        second_deriv = self.analysis_results.get('second_derivative', 'No disponible')
+        second_deriv = self._format_result(second_deriv)
+        second_label = ctk.CTkLabel(
+            self.main_frame,
+            text=f"Segunda derivada: f''(x) = {second_deriv}",
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        second_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        return row + 1
+    
+    def _add_domain_section(self, row: int) -> int:
+        """Add domain section."""
+        section_title = ctk.CTkLabel(
+            self.main_frame,
+            text="DOMINIO",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=("blue", "lightblue")
+        )
+        section_title.grid(row=row, column=0, sticky="w", padx=20, pady=(10, 5))
+        row += 1
+        
+        domain = self.analysis_results.get('domain', 'No disponible')
+        domain = self._format_result(domain)
+        domain_label = ctk.CTkLabel(
+            self.main_frame,
+            text=f"Dominio: {domain}",
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        domain_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        return row + 1
+    
+    def _add_intercepts_section(self, row: int) -> int:
+        """Add intercepts section."""
+        section_title = ctk.CTkLabel(
+            self.main_frame,
+            text="INTERCEPTOS",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=("blue", "lightblue")
+        )
+        section_title.grid(row=row, column=0, sticky="w", padx=20, pady=(10, 5))
+        row += 1
+        
+        intercepts = self.analysis_results.get('intercepts', {})
+        
+        # Y-intercept
+        y_intercept = intercepts.get('y_intercept')
+        if y_intercept is not None:
+            y_text = f"Intercepto Y: (0, {y_intercept})"
+        else:
+            y_text = "Intercepto Y: No existe"
+        
+        y_label = ctk.CTkLabel(
+            self.main_frame,
+            text=y_text,
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        y_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        # X-intercepts
+        x_intercepts = intercepts.get('x_intercepts', [])
+        if x_intercepts:
+            x_points = ", ".join([f"({x}, 0)" for x in x_intercepts])
+            x_text = f"Interceptos X: {x_points}"
+        else:
+            x_text = "Interceptos X: No existen"
+        
+        x_label = ctk.CTkLabel(
+            self.main_frame,
+            text=x_text,
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        x_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        return row + 1
+    
+    def _add_symmetry_section(self, row: int) -> int:
+        """Add symmetry section."""
+        section_title = ctk.CTkLabel(
+            self.main_frame,
+            text="SIMETRÍA",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=("blue", "lightblue")
+        )
+        section_title.grid(row=row, column=0, sticky="w", padx=20, pady=(10, 5))
+        row += 1
+        
+        symmetry = self.analysis_results.get('symmetry', 'No determinada')
+        symmetry_map = {
+            'even': 'Par (simétrica respecto al eje Y)',
+            'odd': 'Impar (simétrica respecto al origen)',
+            'neither': 'Ni par ni impar'
+        }
+        symmetry_text = symmetry_map.get(symmetry, symmetry)
+        
+        symmetry_label = ctk.CTkLabel(
+            self.main_frame,
+            text=f"Tipo de simetría: {symmetry_text}",
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        symmetry_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        return row + 1
+    
+    def _add_asymptotes_section(self, row: int) -> int:
+        """Add asymptotes section."""
+        section_title = ctk.CTkLabel(
+            self.main_frame,
+            text="ASÍNTOTAS",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=("blue", "lightblue")
+        )
+        section_title.grid(row=row, column=0, sticky="w", padx=20, pady=(10, 5))
+        row += 1
+        
+        asymptotes = self.analysis_results.get('asymptotes', {})
+        
+        # Vertical asymptotes
+        vertical = asymptotes.get('vertical', [])
+        if vertical:
+            v_text = f"Asíntotas verticales: x = {', x = '.join(map(str, vertical))}"
+        else:
+            v_text = "Asíntotas verticales: No existen"
+        
+        v_label = ctk.CTkLabel(
+            self.main_frame,
+            text=v_text,
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        v_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        # Horizontal asymptotes
+        horizontal = asymptotes.get('horizontal', [])
+        if horizontal:
+            h_text = f"Asíntotas horizontales: y = {', y = '.join(map(str, horizontal))}"
+        else:
+            h_text = "Asíntotas horizontales: No existen"
+        
+        h_label = ctk.CTkLabel(
+            self.main_frame,
+            text=h_text,
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        h_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        # Oblique asymptotes
+        oblique = asymptotes.get('oblique', [])
+        if oblique:
+            o_text = f"Asíntotas oblicuas: {', '.join(oblique)}"
+        else:
+            o_text = "Asíntotas oblicuas: No existen"
+        
+        o_label = ctk.CTkLabel(
+            self.main_frame,
+            text=o_text,
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        o_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        return row + 1
+    
+    def _add_critical_points_section(self, row: int) -> int:
+        """Add critical points section."""
+        section_title = ctk.CTkLabel(
+            self.main_frame,
+            text="PUNTOS CRÍTICOS",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=("blue", "lightblue")
+        )
+        section_title.grid(row=row, column=0, sticky="w", padx=20, pady=(10, 5))
+        row += 1
+        
+        critical_points = self.analysis_results.get('critical_points', [])
+        if critical_points:
+            points_text = ", ".join([f"x = {point}" for point in critical_points])
+            cp_text = f"Puntos críticos: {points_text}"
+            
+            # Add function values if available
+            critical_values = self.analysis_results.get('critical_points_values', {})
+            if critical_values:
+                values_text = []
+                for point in critical_points:
+                    value = critical_values.get(str(point))
+                    if value is not None:
+                        values_text.append(f"f({point}) = {value}")
+                if values_text:
+                    cp_text += f"\nValores: {', '.join(values_text)}"
+        else:
+            cp_text = "Puntos críticos: No existen"
+        
+        cp_label = ctk.CTkLabel(
+            self.main_frame,
+            text=cp_text,
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        cp_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        return row + 1
+    
+    def _add_inflection_points_section(self, row: int) -> int:
+        """Add inflection points section."""
+        section_title = ctk.CTkLabel(
+            self.main_frame,
+            text="PUNTOS DE INFLEXIÓN",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=("blue", "lightblue")
+        )
+        section_title.grid(row=row, column=0, sticky="w", padx=20, pady=(10, 5))
+        row += 1
+        
+        inflection_points = self.analysis_results.get('inflection_points', [])
+        if inflection_points:
+            points_text = ", ".join([f"x = {point}" for point in inflection_points])
+            ip_text = f"Puntos de inflexión: {points_text}"
+            
+            # Add function values if available
+            inflection_values = self.analysis_results.get('inflection_points_values', {})
+            if inflection_values:
+                values_text = []
+                for point in inflection_points:
+                    value = inflection_values.get(str(point))
+                    if value is not None:
+                        values_text.append(f"f({point}) = {value}")
+                if values_text:
+                    ip_text += f"\nValores: {', '.join(values_text)}"
+        else:
+            ip_text = "Puntos de inflexión: No existen"
+        
+        ip_label = ctk.CTkLabel(
+            self.main_frame,
+            text=ip_text,
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        ip_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        return row + 1
+    
+    def _add_monotonicity_section(self, row: int) -> int:
+        """Add monotonicity section."""
+        section_title = ctk.CTkLabel(
+            self.main_frame,
+            text="MONOTONÍA",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=("blue", "lightblue")
+        )
+        section_title.grid(row=row, column=0, sticky="w", padx=20, pady=(10, 5))
+        row += 1
+        
+        monotonicity = self.analysis_results.get('monotonicity', {})
+        
+        # Increasing intervals
+        increasing = monotonicity.get('increasing', [])
+        if increasing:
+            inc_intervals = self._format_intervals(increasing)
+            inc_text = f"Intervalos crecientes: {inc_intervals}"
+        else:
+            inc_text = "Intervalos crecientes: No existen"
+        
+        inc_label = ctk.CTkLabel(
+            self.main_frame,
+            text=inc_text,
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        inc_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        # Decreasing intervals
+        decreasing = monotonicity.get('decreasing', [])
+        if decreasing:
+            dec_intervals = self._format_intervals(decreasing)
+            dec_text = f"Intervalos decrecientes: {dec_intervals}"
+        else:
+            dec_text = "Intervalos decrecientes: No existen"
+        
+        dec_label = ctk.CTkLabel(
+            self.main_frame,
+            text=dec_text,
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        dec_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        return row + 1
+    
+    def _add_concavity_section(self, row: int) -> int:
+        """Add concavity section."""
+        section_title = ctk.CTkLabel(
+            self.main_frame,
+            text="CONCAVIDAD",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=("blue", "lightblue")
+        )
+        section_title.grid(row=row, column=0, sticky="w", padx=20, pady=(10, 5))
+        row += 1
+        
+        concavity = self.analysis_results.get('concavity', {})
+        
+        # Concave up intervals
+        concave_up = concavity.get('concave_up', [])
+        if concave_up:
+            up_intervals = self._format_intervals(concave_up)
+            up_text = f"Intervalos cóncavos hacia arriba: {up_intervals}"
+        else:
+            up_text = "Intervalos cóncavos hacia arriba: No existen"
+        
+        up_label = ctk.CTkLabel(
+            self.main_frame,
+            text=up_text,
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        up_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        # Concave down intervals
+        concave_down = concavity.get('concave_down', [])
+        if concave_down:
+            down_intervals = self._format_intervals(concave_down)
+            down_text = f"Intervalos cóncavos hacia abajo: {down_intervals}"
+        else:
+            down_text = "Intervalos cóncavos hacia abajo: No existen"
+        
+        down_label = ctk.CTkLabel(
+            self.main_frame,
+            text=down_text,
+            font=ctk.CTkFont(size=14),
+            wraplength=700,
+            justify="left"
+        )
+        down_label.grid(row=row, column=0, sticky="w", padx=40, pady=2)
+        row += 1
+        
+        return row + 1
+    
+    def _add_close_button(self, row: int):
+        """Add close button."""
+        close_button = ctk.CTkButton(
+            self.main_frame,
+            text="Cerrar",
             command=self.destroy,
-            font=("Arial", 18),
-            width=120,
+            width=200,
             height=40,
-            fg_color="#032B44"
+            font=ctk.CTkFont(size=16, weight="bold")
         )
-        back_btn.pack(pady=20)
-
-        # Panel de parámetros
-        self.setup_parameters_panel(left_frame)
-
-        # Panel de análisis
-        self.setup_analysis_panel(left_frame)
-
-        # Configurar gráfico
-        self.setup_graph_panel(right_frame)
-
-    def setup_parameters_panel(self, parent):
-        """Panel de parámetros organizado verticalmente"""
-        param_frame = ctk.CTkFrame(parent, fg_color="#e0e0e0")
-        param_frame.pack(fill="both", expand=True, padx=5, pady=5)
-
-        # Título
-        ctk.CTkLabel(
-            param_frame,
-            text="PARÁMETROS AJUSTABLES:",
-            font=("Arial", 20, "bold")
-        ).pack(pady=(5, 15))
-
-        # Frame para scroll vertical
-        scroll_frame = ctk.CTkScrollableFrame(param_frame)
-        scroll_frame.pack(fill="both", expand=True)
-
-        # Obtener variables (excluyendo x)
-        variables = [str(s) for s in self.function.free_symbols if str(s) != 'x']
-
-        if not variables:
-            ctk.CTkLabel(
-                scroll_frame,
-                text="No hay parámetros ajustables",
-                font=("Arial", 16)
-            ).pack(pady=10)
-            return
-
-        for var in variables:
-            # Frame para cada parámetro
-            param_row = ctk.CTkFrame(scroll_frame, fg_color="transparent")
-            param_row.pack(fill="x", pady=5, padx=5)
-
-            # Etiqueta del parámetro (30% de ancho)
-            ctk.CTkLabel(
-                param_row,
-                text=f"{var}:",
-                font=("Arial", 18),
-                width=10,
-                anchor="w"
-            ).pack(side="left", padx=(10, 5))
-
-            # Slider (50% de ancho)
-            slider = ctk.CTkSlider(
-                param_row,
-                from_=-5,
-                to=5,
-                number_of_steps=100,
-                width=200,
-                command=lambda val, v=var: self.update_parameter(v, float(val))
-            )
-            slider.pack(side="left", padx=5, expand=True)
-            slider.set(1.0)
-
-            # Entry (20% de ancho)
-            entry = ctk.CTkEntry(
-                param_row,
-                width=80,
-                font=("Arial", 18),
-                justify="center"
-            )
-            entry.pack(side="left", padx=(5, 10))
-            entry.insert(0, "1.0")
-
-            # Configurar eventos
-            entry.bind("<Return>",
-                    lambda event, v=var, s=slider, e=entry: self.update_from_entry(v, s, e))
-
-            # Guardar referencia
-            self.parameters[var] = {
-                'slider': slider,
-                'entry': entry,
-                'value': 1.0
-            }
-
-    def update_parameter(self, param_name, value):
-        """Actualiza desde el slider"""
-        try:
-            # Actualizar valor
-            self.parameters[param_name]['value'] = value
-
-            # Actualizar entry correspondiente
-            self.parameters[param_name]['entry'].delete(0, tk.END)
-            self.parameters[param_name]['entry'].insert(0, f"{value:.2f}")
-
-            # Regraficar
-            self.plot_function()
-        except Exception as e:
-            print(f"Error actualizando parámetro {param_name}: {str(e)}")
-
-    def update_from_entry(self, param_name, slider, entry):
-        """Actualiza desde el campo de texto"""
-        try:
-            value = float(entry.get())
-            # Validar rango
-            value = max(-5, min(5, value))
-
-            # Actualizar valor
-            self.parameters[param_name]['value'] = value
-
-            # Actualizar slider correspondiente
-            slider.set(value)
-
-            # Actualizar entry (por si hubo ajuste de rango)
-            entry.delete(0, tk.END)
-            entry.insert(0, f"{value:.2f}")
-
-            # Regraficar
-            self.plot_function()
-        except ValueError:
-            # Si el valor no es numérico, restaurar el anterior
-            entry.delete(0, tk.END)
-            entry.insert(0, f"{self.parameters[param_name]['value']:.2f}")
-
-    def setup_analysis_panel(self, parent):
-        """Panel de resultados de análisis"""
-        analysis_frame = ctk.CTkScrollableFrame(parent, height=400)
-        analysis_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-        # Título (texto grande)
-        ctk.CTkLabel(
-            analysis_frame,
-            text="Análisis:",
-            font=("Arial", 20, "bold")
-        ).pack(pady=10)
-
-        # Lista de análisis (texto grande)
-        analyses = [
-            ("Dominio:", "empty"),
-            ("Interceptos:", "empty"),
-            ("Simetría:", "empty"),
-            ("Asíntotas:", "empty"),
-            ("Derivada:", "empty"),
-            ("Monotonía:", "empty"),
-            ("Extremos:", "empty"),
-            ("Concavidad:", "empty")
-        ]
-
-        for title, value in analyses:
-            frame = ctk.CTkFrame(analysis_frame, fg_color="#ffffff")
-            frame.pack(fill="x", pady=5)
-
-            ctk.CTkLabel(
-                frame,
-                text=title,
-                font=("Arial", 18, "bold"),
-                width=150,
-                anchor="w"
-            ).pack(side="left", padx=10)
-
-            ctk.CTkLabel(
-                frame,
-                text=value,
-                font=("Arial", 18)
-            ).pack(side="left", padx=10)
-
-    def setup_graph_panel(self, parent):
-        """Configura el panel del gráfico"""
-        self.figure, self.ax = plt.subplots(figsize=(8, 6), dpi=100)
-        self.canvas = FigureCanvasTkAgg(self.figure, parent)
-        self.canvas.get_tk_widget().pack(fill="both", expand=True)
-
-        # Configuración inicial
-        self.ax.set_facecolor('#f0f0f0')
-        self.ax.grid(True, linestyle='--', alpha=0.7)
-
-    def plot_function(self):
-        """Dibuja la función actual"""
-        try:
-            self.ax.clear()
-
-            # Aplicar parámetros
-            current_func = self.function
-            for param, data in self.parameters.items():
-                current_func = current_func.subs(param, data['value'])
-
-            # Verificar si la función es 0
-            if current_func == 0:
-                self.canvas.draw()
-                return
-
-            # Encontrar asíntotas verticales
-            vertical_asymptotes = sp.solve(sp.denom(current_func), self.x)
-            vertical_asymptotes = [float(a) for a in vertical_asymptotes if a.is_real]
-
-            # Encontrar asíntotas horizontales
-            horizontal_asymptote = sp.limit(current_func, self.x, sp.oo)
-
-            # Convertir a numérico
-            f = sp.lambdify(self.x, current_func, 'numpy')
-            x_vals = np.linspace(-10, 10, 10000)
-            y_vals = f(x_vals)
-
-            # Dibujar función
-            self.ax.plot(x_vals, y_vals, label=f"f(x) = {sp.pretty(current_func)}", linewidth=2)
-
-            # Dibujar asíntotas verticales
-            for va in vertical_asymptotes:
-                self.ax.axvline(va, color='red', linestyle='--', linewidth=1)
-
-            # Dibujar asíntota horizontal
-            if horizontal_asymptote.is_real:
-                self.ax.axhline(float(horizontal_asymptote), color='red', linestyle='--', linewidth=1)
-
-            # Configuración de ejes
-            self.ax.axhline(0, color='black', linewidth=0.5)
-            self.ax.axvline(0, color='black', linewidth=0.5)
-            self.ax.legend(fontsize=14, loc='upper right', frameon=True, fancybox=True, framealpha=0.7, borderpad=1)
+        close_button.grid(row=row, column=0, pady=20)
+    
+    def _format_result(self, result: Any) -> str:
+        """Format analysis result for display."""
+        if isinstance(result, dict) and 'error' in result:
+            return f"Error: {result['error']}"
+        elif result is None:
+            return "No disponible"
+        else:
+            return str(result)
+    
+    def _format_intervals(self, intervals: List[tuple]) -> str:
+        """Format interval list for display."""
+        if not intervals:
+            return "No existen"
+        
+        formatted_intervals = []
+        for interval in intervals:
+            if len(interval) == 2:
+                start, end = interval
+                # Handle infinity values
+                start_str = "-∞" if start == float('-inf') else str(start)
+                end_str = "+∞" if end == float('inf') else str(end)
+                formatted_intervals.append(f"({start_str}, {end_str})")
+        
+        return ", ".join(formatted_intervals) if formatted_intervals else "No existen"
 
 
-            # Ajustar límites de los ejes para centrar la gráfica
-            self.ax.set_xlim([-10, 10])
-            self.ax.set_ylim([min(y_vals) - 1, max(y_vals) + 1])
-
-            self.canvas.draw()
-        except Exception as e:
-            print(f"Error al graficar: {str(e)}")
-
-    def show_error(self, message):
-        """Muestra mensaje de error"""
-        error_label = ctk.CTkLabel(
-            self,
-            text=message,
-            text_color="red",
-            font=("Arial", 18)
-        )
-        error_label.grid(row=0, column=0, padx=20, pady=20)
+# Utility function for quick display
+def show_analysis_results(master, analysis_results: Dict[str, Any]) -> ShowInfoFrame:
+    """
+    Utility function to quickly display analysis results.
+    
+    Args:
+        master: Parent widget
+        analysis_results: Dictionary containing function analysis results
+        
+    Returns:
+        ShowInfoFrame instance
+    """
+    return ShowInfoFrame(master, analysis_results)
